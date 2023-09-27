@@ -191,7 +191,7 @@ def inference(image_path):
     image = image.unsqueeze(0)
     #image = image.to(device)
     model = DeBlurImages()
-    model.load_state_dict(torch.load('/home/patel.aryam/DeBlur/weights.pt'))
+    model.load_state_dict(torch.load('/home/patel.aryam/DeBlur/weights.pth'))
     with torch.no_grad():
         prediction = model(image)
         prediction = prediction.squeeze(0)
@@ -215,9 +215,9 @@ def main() :
         break
 
     model = DeBlurImages()
-    learning_rate = 1e-5
+    learning_rate = 1e-7
     momentum = 0.9
-    step_size = 25
+    step_size = 30
     gamma = 0.1  # decay factor
     num_epochs = 200    
     model.to(device)
