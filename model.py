@@ -15,6 +15,9 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
 class DeBlurImages(nn.Module):
+    """
+    A Fully Convolution network
+    """
     def __init__(self):
         super(DeBlurImages, self).__init__()
 
@@ -32,7 +35,6 @@ class DeBlurImages(nn.Module):
         self.conv5 = nn.Conv2d(in_channels= 512, out_channels= 512, kernel_size= 3)
 
         # Decoding Layers.
-        # generate a uconv1 layer with in_channels=512 and out_channels=256, the output of this layer should be of the dimensions (1x256x34x54)
         self.uconv1 = nn.ConvTranspose2d(in_channels= 512, out_channels= 256, kernel_size= 8, stride= 2, padding= 0)
         self.uconv2 = nn.ConvTranspose2d(in_channels= 256, out_channels= self.D, kernel_size= 5, stride= 2, padding= 0)
         self.uconv3 = nn.ConvTranspose2d(in_channels= self.D, out_channels= self.D, kernel_size= 20, stride= 4, padding= 0)
@@ -42,7 +44,9 @@ class DeBlurImages(nn.Module):
         self.conv7 = nn.Conv2d(in_channels= 256, out_channels= self.D, kernel_size = 1)
                 
     def forward(self, x):
-        
+        """
+        Forward pass of the network
+        """
         x = self.conv1(x)
         x = nn.ReLU()(x)   
         x = self.pool1(x)
@@ -76,6 +80,10 @@ class DeBlurImages(nn.Module):
     def compute_loss_rmse(self, prediction, u_target, v_target):
         """
         Computes the RMSE loss function for the optical flow estimation
+        Args:
+            prediction: The predicted flow field of size BxDxHxW
+            u_target: The target u component of the flow field of size BxHxW
+            v_target: The target v component of the flow field of size BxHxW
         """
 
         # Slice the predictions into u and v components as half of 256
@@ -100,7 +108,11 @@ class DeBlurImages(nn.Module):
 
     def compute_loss(self, prediction, u_target, v_target):
         """
-        Computes the loss function for the optical flow estimation
+        Computes the loss function for the optical flow estimation using Softmax layers.
+        Args:
+            prediction: The predicted flow field of size BxDxHxW
+            u_target: The target u component of the flow field of size BxHxW
+            v_target: The target v component of the flow field of size BxHxW
         """
 
         # Slice the predictions into u and v components as half of 256
@@ -118,7 +130,7 @@ class DeBlurImages(nn.Module):
         u_target = u_target.view(B, 1, H * W)
         v_target = v_target.view(B, 1, H * W)
 
-        # Compute the indicator function for the u and v components
+        # Compute the indicator function for the u and v components using a tolerance of 1e-50.
         #u_indicator = torch.isclose(u_prediction, u_target.float(), atol=1e-50)
         #v_indicator = torch.isclose(v_prediction, v_target.float(), atol=1e-50)
         
@@ -142,6 +154,10 @@ class DeBlurImages(nn.Module):
 
 
 class BlurDataLoader(Dataset):
+    """
+    Dataloader for loading the images and the u, v mats. 
+    """
+
     def __init__(self, root_dir):
         self.root_dir = root_dir
         self.file_list = os.listdir(root_dir)
@@ -183,26 +199,28 @@ class BlurDataLoader(Dataset):
 def inference(image_path):
     """
     Function to perform inference on a single image 
+    Args:
+        image_path: The path of the image
     """
     print("Performing evaluation on a single image ...")
     image = Image.open(image_path)
-    image = transforms.PILToTensor()(image)
+    image = transforms.ToTensor()(image)
+    image = transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5,0.5,0.5])(image)
     image = image.float()
     image = image.unsqueeze(0)
-    #image = image.to(device)
     model = DeBlurImages()
-    model.load_state_dict(torch.load('/home/patel.aryam/DeBlur/weights.pth'))
+    model.load_state_dict(torch.load('DeBlur/weights.pth'))
     with torch.no_grad():
         prediction = model(image)
         prediction = prediction.squeeze(0)
         prediction = prediction.cpu().detach().numpy()
-        # Save to a file
-        np.save('/home/patel.aryam/DeBlur/result' + '_flowfield.npy', prediction)
+        # Save the file as a mat file
+        sio.savemat('DeBlur/result' + '_flowfield.mat', {'mfmap': prediction})
     return prediction
 
 def main() :
     
-    dataset = BlurDataLoader("/home/patel.aryam/DeBlur/dataset_old/data_syn/train")
+    dataset = BlurDataLoader("DeBlur/dataset_old/data_syn/train")
     dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
     
     for batch in dataloader:
@@ -215,7 +233,7 @@ def main() :
         break
 
     model = DeBlurImages()
-    learning_rate = 1e-7
+    learning_rate = 1e-6
     momentum = 0.9
     step_size = 30
     gamma = 0.1  # decay factor
@@ -223,8 +241,8 @@ def main() :
     model.to(device)
     optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum)
     scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
-    loss_func = nn.CrossEntropyLoss()
     model.load_state_dict(torch.load('/home/patel.aryam/DeBlur/weights.pth'))
+
     for epoch in range(num_epochs) :
         for images , u_values, v_values in tqdm(dataloader) :
             prediction = model(images)
@@ -237,14 +255,13 @@ def main() :
         print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item()}, LR: {scheduler.get_last_lr()[0]}")
         
     # Save the best weights of the model.
-    torch.save(model.state_dict(), '/home/patel.aryam/DeBlur/weights.pth')
+    torch.save(model.state_dict(), 'DeBlur/weights.pth')
 
-    #inference(image_path= "/home/patel.aryam/DeBlur/dataset_old/data_syn/train/8143_006_blurryimg.png")
+    inference(image_path= "DeBlur/dataset_old/data_syn/train/8143_006_blurryimg.png")
 
     
 
 if __name__ == "__main__":
     main()
-    inference(image_path= "/home/patel.aryam/DeBlur/dataset_old/data_syn/train/8143_012_blurryimg.png")
 
 
