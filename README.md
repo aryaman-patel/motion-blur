@@ -1,5 +1,5 @@
 # Removing Motion Blur
-This project aims to predict the blur kernel that can be used to deblur an images using Non-blind deconvolution. 
+This project aims to predict the blur kernel using an FCN, that can be used to deblur an images using Non-blind deconvolution. 
 
 ![image](https://github.com/aryaman-patel/motion-blur/assets/117113574/44367e43-8bfb-4b9b-bf2a-3c9087eaee9e)
 
@@ -19,7 +19,7 @@ The `model.py` contains the entire FCN architecture as illustrated in the paper:
 
 The model can also be trained on the included dataset.
 
-The `preprocess_data.py` folder contains the the code to resize all the images to a standard size of `300x460` for the model to process them. However, the example dataset has already been preprocessed to this size. 
+The `preprocess_data.py` folder contains the the code to resize all the images to a standard size of `300x460` for the model to process them. The example dataset has already been preprocessed to this size. 
 
 In order to see the results on the example image, run the `flow_field.py` file that produces the optical flow vector field, of the results `result_flowfield.mat` obtained by running inference on an example image `8143_021_blurryimg.png`. 
 
